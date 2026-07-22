@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 
 from botocore.exceptions import ClientError
 
-from bedrock_demo import AWS_REGION, EMBEDDING_TEST_INPUT, MODEL_CATALOG, TEST_PROMPT, ResultsCollector, handle_error, run_nova_embeddings, run_nova_generation_models, run_openai_models
+from bedrock_demo import AWS_REGION, EMBEDDING_TEST_INPUT, MODEL_CATALOG, TEST_PROMPT, ResultsCollector, handle_error, run_nova_embeddings, run_nova_generation_models
 
 
 class TestResultsCollector:
@@ -69,7 +69,6 @@ class TestErrorHandling:
         error = ClientError({"Error": {"Code": "ResourceNotFoundException", "Message": "Model not found"}}, "converse")
         result = handle_error(error, "test-model")
         assert "ResourceNotFoundException" in result
-        assert AWS_REGION in result
 
     def test_handle_generic_exception(self):
         """Test handling of generic exceptions."""
@@ -113,7 +112,7 @@ class TestNovaGenerationModels:
         results = ResultsCollector()
         run_nova_generation_models(results)
 
-        assert len(results.failed) == 5
+        assert len(results.failed) == 4
         captured = capsys.readouterr()
         assert "AccessDeniedException" in captured.out
 
@@ -125,7 +124,7 @@ class TestNovaGenerationModels:
         results = ResultsCollector()
         run_nova_generation_models(results)
 
-        assert len(results.failed) == 5
+        assert len(results.failed) == 4
         captured = capsys.readouterr()
         assert "Failed to initialize Bedrock client" in captured.out
 
@@ -187,40 +186,6 @@ class TestNovaEmbeddings:
         assert "no embedding found" in captured.out
 
 
-class TestOpenAIModels:
-    """Test OpenAI model testing function."""
-
-    @patch("bedrock_demo.OpenAI")
-    def test_successful_openai_call(self, mock_openai, capsys):
-        """Test successful OpenAI model calls."""
-        mock_client = MagicMock()
-        mock_openai.return_value = mock_client
-
-        mock_response = MagicMock()
-        mock_response.choices = [MagicMock()]
-        mock_response.choices[0].message.content = "AWS Bedrock is a managed service for AI models."
-        mock_client.chat.completions.create.return_value = mock_response
-
-        results = ResultsCollector()
-        run_openai_models(results)
-
-        assert len(results.successful) == 3
-        captured = capsys.readouterr()
-        assert "TESTING OPENAI GPT-5 MODELS" in captured.out
-
-    @patch("bedrock_demo.OpenAI")
-    def test_openai_client_initialization_failure(self, mock_openai, capsys):
-        """Test OpenAI with client initialization failure."""
-        mock_openai.side_effect = Exception("Failed to initialize OpenAI client")
-
-        results = ResultsCollector()
-        run_openai_models(results)
-
-        assert len(results.failed) == 3
-        captured = capsys.readouterr()
-        assert "Failed to initialize OpenAI client" in captured.out
-
-
 class TestModelCatalog:
     """Test model catalog configuration."""
 
@@ -230,12 +195,8 @@ class TestModelCatalog:
             "amazon.nova-micro-v1:0",
             "amazon.nova-lite-v1:0",
             "amazon.nova-pro-v1:0",
-            "amazon.nova-premier-v1:0",
             "amazon.nova-2-lite-v1:0",
             "amazon.nova-2-multimodal-embeddings-v1:0",
-            "openai.gpt-5.4",
-            "openai.gpt-5.5",
-            "openai.gpt-5.6",
         ]
 
         for model_id in expected_models:
@@ -244,6 +205,13 @@ class TestModelCatalog:
             assert "type" in MODEL_CATALOG[model_id]
             assert "context" in MODEL_CATALOG[model_id]
             assert "description" in MODEL_CATALOG[model_id]
+
+    def test_model_catalog_excludes_removed_models(self):
+        """Test that removed models are not in the catalog."""
+        assert "amazon.nova-premier-v1:0" not in MODEL_CATALOG
+        assert "openai.gpt-5.4" not in MODEL_CATALOG
+        assert "openai.gpt-5.5" not in MODEL_CATALOG
+        assert "openai.gpt-5.6" not in MODEL_CATALOG
 
     def test_model_catalog_structure(self):
         """Test that each model catalog entry has correct structure."""

@@ -2,7 +2,7 @@
 """
 AWS Bedrock Model Testing Demonstrator
 
-Tests Amazon Nova and OpenAI GPT-5 models available through AWS Bedrock.
+Tests Amazon Nova models available through AWS Bedrock.
 """
 
 import json
@@ -11,28 +11,38 @@ import time
 
 import boto3
 from botocore.exceptions import ClientError
-from openai import APIError, AuthenticationError, OpenAI
 
 MODEL_CATALOG = {
-    "amazon.nova-micro-v1:0": {"name": "Amazon Nova Micro", "type": "Text Generation", "context": "128K tokens", "description": "Text-only model optimized for lowest latency and cost"},
-    "amazon.nova-lite-v1:0": {"name": "Amazon Nova Lite", "type": "Multimodal Generation", "context": "300K tokens", "description": "Cost-efficient multimodal (text, image, video)"},
-    "amazon.nova-pro-v1:0": {"name": "Amazon Nova Pro", "type": "Multimodal Generation", "context": "300K tokens", "description": "High-performance multimodal for complex reasoning"},
-    "amazon.nova-premier-v1:0": {"name": "Amazon Nova Premier", "type": "Multimodal Generation", "context": "1M tokens", "description": "Most capable model for complex multi-step reasoning"},
+    "amazon.nova-micro-v1:0": {
+        "name": "Amazon Nova Micro",
+        "type": "Text Generation",
+        "context": "128K tokens | Max output: 5K",
+        "description": "Amazon's fastest text-only model optimized for speed and low cost. Excels at summarization, translation, and classification. Knowledge cutoff: Oct 2024. Launched: Dec 2024.",
+    },
+    "amazon.nova-lite-v1:0": {
+        "name": "Amazon Nova Lite",
+        "type": "Multimodal Generation",
+        "context": "300K tokens | Max output: 5K",
+        "description": "Amazon's low-cost multimodal model processing text, images, and video. Ideal for document analysis, visual Q&A, and cost-sensitive workloads. Knowledge cutoff: Oct 2024. Launched: Dec 2024.",
+    },
+    "amazon.nova-pro-v1:0": {
+        "name": "Amazon Nova Pro",
+        "type": "Multimodal Generation",
+        "context": "300K tokens | Max output: 5K",
+        "description": "Amazon's balanced multimodal model offering strong accuracy, speed, and cost across text, images, and video. Best price-performance for most enterprise tasks. Knowledge cutoff: Oct 2024. Launched: Dec 2024.",
+    },
     "amazon.nova-2-lite-v1:0": {
         "name": "Amazon Nova 2 Lite",
         "type": "Multimodal Generation",
-        "context": "1M tokens",
-        "description": "Advanced reasoning with extended thinking, web grounding, code interpreter",
+        "context": "1M tokens | Max output: 64K",
+        "description": "Cost-efficient multimodal model for automation, document processing, and customer support. Features extended thinking, web grounding, code interpreter, and optimized agent workflows. Knowledge cutoff: Oct 2025. Launched: Dec 2025.",
     },
     "amazon.nova-2-multimodal-embeddings-v1:0": {
-        "name": "Nova 2 Multimodal Embeddings",
+        "name": "Amazon Nova Multimodal Embeddings",
         "type": "Embeddings",
-        "context": "8,172 tokens",
-        "description": "Unified embedding model for text, documents, images, video, audio",
+        "context": "Dimensions: 3072 / 1024 / 384 / 256",
+        "description": "Unified embedding model converting text, images, documents, video, and audio into a single vector space. Enables cross-modal retrieval, multimodal semantic search, and agentic RAG. Launched: Oct 2025.",
     },
-    "openai.gpt-5.4": {"name": "OpenAI GPT-5.4", "type": "Text Generation", "context": "~1M tokens", "description": "Affordable, capable model for standard coding and professional tasks"},
-    "openai.gpt-5.5": {"name": "OpenAI GPT-5.5", "type": "Text Generation", "context": "~1M tokens", "description": "Advanced reasoning for coding and professional tasks"},
-    "openai.gpt-5.6": {"name": "OpenAI GPT-5.6", "type": "Text Generation", "context": "1.05M tokens", "description": "Latest flagship with Sol/Terra/Luna variants"},
 }
 
 
@@ -90,16 +100,9 @@ def handle_error(error: Exception, model_id: str) -> str:
         elif error_code == "ValidationException":
             return f"ValidationException - {error_message}\n💡 Fix: Check model parameters or model ID format"
         elif error_code == "ResourceNotFoundException":
-            return f"ResourceNotFoundException - Model not available in {AWS_REGION}\n💡 Fix: Check model availability in this region"
+            return f"ResourceNotFoundException - {error_message}\n💡 Fix: Enable model access in the AWS Bedrock console (cross-region inference profiles require explicit access)"
         else:
             return f"{error_code} - {error_message}"
-
-    elif isinstance(error, AuthenticationError):
-        return f"Authentication failed - {str(error)}\n💡 Fix: Verify AWS credentials and Bedrock access"
-
-    elif isinstance(error, APIError):
-        return f"API Error - {str(error)}"
-
     else:
         return f"Unexpected error - {str(error)}"
 
@@ -110,7 +113,7 @@ def run_nova_generation_models(results: ResultsCollector):
     print("🧪 TESTING NOVA GENERATION MODELS")
     print("═" * 67 + "\n")
 
-    generation_models = ["amazon.nova-micro-v1:0", "amazon.nova-lite-v1:0", "amazon.nova-pro-v1:0", "amazon.nova-premier-v1:0", "amazon.nova-2-lite-v1:0"]
+    generation_models = ["amazon.nova-micro-v1:0", "amazon.nova-lite-v1:0", "amazon.nova-pro-v1:0", "us.amazon.nova-2-lite-v1:0"]
 
     try:
         bedrock = boto3.client(service_name="bedrock-runtime", region_name=AWS_REGION)
@@ -131,12 +134,10 @@ def run_nova_generation_models(results: ResultsCollector):
             elapsed_time = time.time() - start_time
 
             response_text = response["output"]["message"]["content"][0]["text"]
-            truncated_text = response_text[:150] + "..." if len(response_text) > 150 else response_text
-
             input_tokens = response["usage"]["inputTokens"]
             output_tokens = response["usage"]["outputTokens"]
 
-            print(f"✓ Response: {truncated_text}")
+            print(f"✓ Response: {response_text}")
             print(f"⏱️  Latency: {elapsed_time:.2f}s")
             print(f"📊 Input tokens: {input_tokens}, Output tokens: {output_tokens}\n")
 
@@ -168,7 +169,10 @@ def run_nova_embeddings(results: ResultsCollector):
     try:
         start_time = time.time()
 
-        request_body = {"inputText": EMBEDDING_TEST_INPUT, "embeddingConfig": {"outputEmbeddingLength": 1024}}
+        request_body = {
+            "taskType": "SINGLE_EMBEDDING",
+            "singleEmbeddingParams": {"embeddingPurpose": "GENERIC_INDEX", "embeddingDimension": 1024, "text": {"truncationMode": "END", "value": EMBEDDING_TEST_INPUT}},
+        }
 
         response = bedrock.invoke_model(modelId=model_id, body=json.dumps(request_body), contentType="application/json", accept="application/json")
 
@@ -183,8 +187,15 @@ def run_nova_embeddings(results: ResultsCollector):
             print(f"⏱️  Latency: {elapsed_time:.2f}s\n")
 
             results.add_success(model_id, elapsed_time)
+        elif "embeddings" in response_body:
+            embedding_dims = len(response_body["embeddings"])
+            print("✓ Embedding generated successfully")
+            print(f"📐 Dimensions: {embedding_dims}")
+            print(f"⏱️  Latency: {elapsed_time:.2f}s\n")
+
+            results.add_success(model_id, elapsed_time)
         else:
-            error_msg = "Unexpected response format - no embedding found"
+            error_msg = f"Unexpected response format - no embedding found. Response keys: {list(response_body.keys())}"
             print(f"✗ Error: {error_msg}\n")
             results.add_failure(model_id, error_msg)
 
@@ -192,50 +203,6 @@ def run_nova_embeddings(results: ResultsCollector):
         error_msg = handle_error(e, model_id)
         print(f"✗ Error: {error_msg}\n")
         results.add_failure(model_id, error_msg)
-
-
-def run_openai_models(results: ResultsCollector):
-    """Test OpenAI GPT-5 models via Bedrock."""
-    print("═" * 67)
-    print("🤖 TESTING OPENAI GPT-5 MODELS")
-    print("═" * 67 + "\n")
-
-    openai_models = ["openai.gpt-5.4", "openai.gpt-5.5", "openai.gpt-5.6"]
-
-    base_url = f"https://bedrock-runtime.{AWS_REGION}.amazonaws.com/openai/v1"
-
-    try:
-        client = OpenAI(api_key="PLACEHOLDER", base_url=base_url)
-    except Exception as e:
-        print(f"✗ Failed to initialize OpenAI client: {e}\n")
-        for model_id in openai_models:
-            results.add_failure(model_id, f"Client initialization failed: {e}")
-        return
-
-    for idx, model_id in enumerate(openai_models, 1):
-        print(f"[{idx}/{len(openai_models)}] Testing {model_id}...")
-
-        try:
-            start_time = time.time()
-
-            response = client.chat.completions.create(
-                model=model_id, messages=[{"role": "system", "content": "You are a helpful assistant."}, {"role": "user", "content": TEST_PROMPT}], temperature=0.7, max_tokens=512
-            )
-
-            elapsed_time = time.time() - start_time
-
-            response_text = response.choices[0].message.content
-            truncated_text = response_text[:150] + "..." if len(response_text) > 150 else response_text
-
-            print(f"✓ Response: {truncated_text}")
-            print(f"⏱️  Latency: {elapsed_time:.2f}s\n")
-
-            results.add_success(model_id, elapsed_time)
-
-        except Exception as e:
-            error_msg = handle_error(e, model_id)
-            print(f"✗ Error: {error_msg}\n")
-            results.add_failure(model_id, error_msg)
 
 
 def print_summary(results: ResultsCollector):
@@ -272,7 +239,6 @@ def main():
 
     run_nova_generation_models(results)
     run_nova_embeddings(results)
-    run_openai_models(results)
 
     print_summary(results)
 

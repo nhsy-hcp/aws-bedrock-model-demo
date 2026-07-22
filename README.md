@@ -1,9 +1,8 @@
 # AWS Bedrock Model Testing Demonstrator
 
 Simple Python script to test AWS Bedrock models including:
-- Amazon Nova v1 family (Micro, Lite, Pro, Premier)
+- Amazon Nova v1 family (Micro, Lite, Pro)
 - Amazon Nova 2 models (Lite, Multimodal Embeddings)
-- OpenAI GPT-5 models (5.4, 5.5, 5.6)
 
 ## Prerequisites
 
@@ -65,8 +64,8 @@ task fmt
 ### AccessDeniedException
 Enable model access in AWS Bedrock console → Model access
 
-### Model not available
-Verify model availability in us-east-1 region
+### Nova Premier not available
+Nova Premier has been removed from this demo (Legacy model, EOL Sep 14, 2026).
 
 ### Authentication errors
 Verify AWS profile is set correctly:

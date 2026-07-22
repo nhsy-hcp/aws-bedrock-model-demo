@@ -138,19 +138,13 @@ task demo
 The demo tests the following AWS Bedrock models:
 
 **Amazon Nova v1 Models:**
-- `amazon.nova-micro-v1:0` - Text-only, lowest latency
-- `amazon.nova-lite-v1:0` - Multimodal, cost-efficient
-- `amazon.nova-pro-v1:0` - High-performance multimodal
-- `amazon.nova-premier-v1:0` - Most capable, complex reasoning
+- `amazon.nova-micro-v1:0` - Text-only, 128K context, lowest latency and cost (launched Dec 2024)
+- `amazon.nova-lite-v1:0` - Multimodal (text/image/video), 300K context, cost-efficient (launched Dec 2024)
+- `amazon.nova-pro-v1:0` - Multimodal, 300K context, best price-performance for enterprise tasks (launched Dec 2024)
 
 **Amazon Nova 2 Models:**
-- `amazon.nova-2-lite-v1:0` - Advanced reasoning with extended thinking
-- `amazon.nova-2-multimodal-embeddings-v1:0` - Unified embeddings
-
-**OpenAI GPT-5 Models:**
-- `openai.gpt-5.4` - Affordable, capable
-- `openai.gpt-5.5` - Advanced reasoning
-- `openai.gpt-5.6` - Latest flagship
+- `amazon.nova-2-lite-v1:0` - Multimodal, 1M context, 64K output. Extended thinking, web grounding, code interpreter (launched Dec 2025)
+- `amazon.nova-2-multimodal-embeddings-v1:0` - Unified embeddings for text, images, documents, video, audio. Dimensions: 3072/1024/384/256 (launched Oct 2025)
 
 ### Troubleshooting
 
