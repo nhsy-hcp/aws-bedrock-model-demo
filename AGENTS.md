@@ -44,11 +44,8 @@ task test:coverage
 #### 3. Code Quality
 
 ```bash
-# Run linting checks (200 char line length, includes pre-commit hooks)
+# Run linting checks and format code automatically (200 char line length)
 task lint
-
-# Format code automatically
-task fmt
 ```
 
 #### 4. Pre-commit Hooks
@@ -143,7 +140,7 @@ The demo tests the following AWS Bedrock models:
 - `amazon.nova-pro-v1:0` - Multimodal, 300K context, best price-performance for enterprise tasks (launched Dec 2024)
 
 **Amazon Nova 2 Models:**
-- `amazon.nova-2-lite-v1:0` - Multimodal, 1M context, 64K output. Extended thinking, web grounding, code interpreter (launched Dec 2025)
+- `us.amazon.nova-2-lite-v1:0` - Multimodal, 1M context, 64K output. Extended thinking, web grounding, code interpreter. Geo cross-region inference profile (launched Dec 2025)
 - `amazon.nova-2-multimodal-embeddings-v1:0` - Unified embeddings for text, images, documents, video, audio. Dimensions: 3072/1024/384/256 (launched Oct 2025)
 
 ### Troubleshooting
@@ -161,8 +158,8 @@ uv run pytest -v tests/test_bedrock_demo.py::TestClass::test_method
 #### Linting Issues
 
 ```bash
-# Auto-fix linting issues
-task fmt
+# Auto-fix linting and formatting issues
+task lint
 
 # Check specific files
 uv run ruff check bedrock_demo.py --line-length=200
@@ -194,7 +191,6 @@ Core dependencies are managed via `uv` and defined in `pyproject.toml`:
 
 **Runtime:**
 - boto3 ≥1.35.0 (AWS SDK)
-- openai ≥1.55.0 (OpenAI SDK)
 
 **Development:**
 - pytest ≥8.0.0 (Testing framework)

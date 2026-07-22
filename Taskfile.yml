@@ -28,16 +28,11 @@ tasks:
       - "{{.PYTEST}} -v --cov=. --cov-report=term-missing --cov-report=html --cov-fail-under=80 tests/"
 
   lint:
-    desc: Run linting checks (200 char line length)
-    cmds:
-      - "{{.RUFF}} check . --line-length=200"
-      - "{{.PRECOMMIT}} run --all-files --show-diff-on-failure"
-
-  fmt:
-    desc: Format code with ruff
+    desc: Format and run linting checks (200 char line length)
     cmds:
       - "{{.RUFF}} format . --line-length=200"
       - "{{.RUFF}} check --fix . --line-length=200"
+      - "{{.PRECOMMIT}} run --all-files --show-diff-on-failure"
 
   hooks:update:
     desc: Update pre-commit hooks to latest versions

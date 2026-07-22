@@ -32,11 +32,8 @@ task demo
 # Run tests
 task test
 
-# Run linting
+# Run linting and formatting
 task lint
-
-# Format code
-task fmt
 ```
 
 ## Development
@@ -47,25 +44,16 @@ task fmt
 task test
 ```
 
-### Linting
+### Linting and Formatting
 
 ```bash
 task lint
-```
-
-### Code Formatting
-
-```bash
-task fmt
 ```
 
 ## Troubleshooting
 
 ### AccessDeniedException
 Enable model access in AWS Bedrock console → Model access
-
-### Nova Premier not available
-Nova Premier has been removed from this demo (Legacy model, EOL Sep 14, 2026).
 
 ### Authentication errors
 Verify AWS profile is set correctly:
