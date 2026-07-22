@@ -2,7 +2,7 @@
 set -euo pipefail
 
 REGION="${AWS_REGION:-us-east-1}"
-PREFIX="BedrockModelDemoHarness_"
+PREFIX="BedrockModelDemoHarness"
 
 echo "Looking for harnesses with prefix '${PREFIX}' in ${REGION}..."
 
