@@ -53,6 +53,7 @@ tasks:
     cmds:
       - "{{.RUFF}} format . --line-length=200"
       - "{{.RUFF}} check --fix . --line-length=200"
+      - shellcheck scripts/*.sh
       - "{{.PRECOMMIT}} run --all-files --show-diff-on-failure"
 
   hooks:update:

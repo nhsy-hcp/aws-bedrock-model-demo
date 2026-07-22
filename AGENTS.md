@@ -102,6 +102,7 @@ task clean
   - Merge conflict detection
   - Private key detection
   - Ruff linting and formatting
+  - Shellcheck (scripts/*.sh)
   - Gitleaks (secret detection)
 
 ### Important Guidelines
