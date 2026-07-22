@@ -50,17 +50,7 @@ task test:coverage
 task lint
 ```
 
-#### 4. Pre-commit Hooks
-
-```bash
-# Update pre-commit hooks to latest versions
-task hooks:update
-
-# Run pre-commit hooks on all files
-task hooks:run
-```
-
-#### 5. Running the Demos
+#### 4. Running the Demos
 
 ```bash
 # Run the Nova model demo (requires AWS credentials)
@@ -82,7 +72,7 @@ task demo:agentcore:delete
 AWS_PROFILE=your-profile-name task demo
 ```
 
-#### 6. Cleanup
+#### 5. Cleanup
 
 ```bash
 # Clean up temporary files and caches
@@ -199,18 +189,6 @@ uv run ruff check bedrock_demo.py --line-length=200
 # View coverage report
 task test:coverage
 # Open htmlcov/index.html to see detailed coverage report
-```
-
-#### Pre-commit Hook Failures
-
-```bash
-# Run hooks individually
-uv run pre-commit run trailing-whitespace --all-files
-uv run pre-commit run ruff --all-files
-uv run pre-commit run gitleaks --all-files
-
-# Update hooks if outdated
-task hooks:update
 ```
 
 ### Dependencies

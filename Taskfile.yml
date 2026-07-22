@@ -56,16 +56,6 @@ tasks:
       - shellcheck scripts/*.sh
       - "{{.PRECOMMIT}} run --all-files --show-diff-on-failure"
 
-  hooks:update:
-    desc: Update pre-commit hooks to latest versions
-    cmds:
-      - "{{.PRECOMMIT}} autoupdate"
-
-  hooks:run:
-    desc: Run pre-commit hooks on all files
-    cmds:
-      - "{{.PRECOMMIT}} run --all-files"
-
   clean:
     desc: Clean up temporary files and caches
     cmds:
