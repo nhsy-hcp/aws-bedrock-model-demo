@@ -1,0 +1,73 @@
+version: '3'
+
+vars:
+  PYTHON: uv run python
+  PYTEST: uv run pytest
+  RUFF: uv run ruff
+  PRECOMMIT: uv run pre-commit
+
+tasks:
+  demo:
+    desc: Run the Bedrock model demo
+    cmds:
+      - "{{.PYTHON}} bedrock_demo.py"
+
+  test:
+    desc: Run all tests
+    cmds:
+      - "{{.PYTEST}} -v tests/"
+
+  test:unit:
+    desc: Run unit tests only
+    cmds:
+      - "{{.PYTEST}} -v tests/test_bedrock_demo.py"
+
+  test:coverage:
+    desc: Run tests with coverage report (min 80%)
+    cmds:
+      - "{{.PYTEST}} -v --cov=. --cov-report=term-missing --cov-report=html --cov-fail-under=80 tests/"
+
+  lint:
+    desc: Run linting checks (200 char line length)
+    cmds:
+      - "{{.RUFF}} check . --line-length=200"
+      - "{{.PRECOMMIT}} run --all-files --show-diff-on-failure"
+
+  fmt:
+    desc: Format code with ruff
+    cmds:
+      - "{{.RUFF}} format . --line-length=200"
+      - "{{.RUFF}} check --fix . --line-length=200"
+
+  hooks:update:
+    desc: Update pre-commit hooks to latest versions
+    cmds:
+      - "{{.PRECOMMIT}} autoupdate"
+
+  hooks:run:
+    desc: Run pre-commit hooks on all files
+    cmds:
+      - "{{.PRECOMMIT}} run --all-files"
+
+  clean:
+    desc: Clean up temporary files and caches
+    cmds:
+      - rm -rf .pytest_cache
+      - rm -rf __pycache__
+      - rm -rf tests/__pycache__
+      - rm -rf .ruff_cache
+      - rm -rf htmlcov
+      - rm -rf .coverage
+      - find . -type f -name "*.pyc" -delete
+      - find . -type d -name "__pycache__" -delete
+
+  deps:
+    desc: Install dependencies
+    cmds:
+      - uv sync
+      - uv sync --extra dev
+
+  init:
+    desc: Initialize project (install dependencies)
+    cmds:
+      - task: deps

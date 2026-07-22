@@ -1,0 +1,222 @@
+# AGENTS.md
+
+## Development Commands
+
+This file provides guidance for AI agents working on the `bedrock-model-demo` project.
+
+### Project Structure
+
+```
+bedrock-model-demo/
+├── bedrock_demo.py          # Main demo script
+├── tests/
+│   └── test_bedrock_demo.py # Unit tests
+├── pyproject.toml           # Python dependencies and configuration
+├── Taskfile.yml             # Task automation
+├── .pre-commit-config.yaml  # Pre-commit hooks configuration
+├── .gitignore               # Git ignore patterns
+├── LICENSE                  # MPL-2.0 license
+└── README.md                # User documentation
+```
+
+### Standard Development Workflow
+
+#### 1. Environment Setup
+
+```bash
+# Initialize project (install dependencies)
+task init
+```
+
+#### 2. Testing
+
+```bash
+# Run all tests
+task test
+
+# Run unit tests only
+task test:unit
+
+# Run tests with coverage report (minimum 80% required)
+task test:coverage
+```
+
+#### 3. Code Quality
+
+```bash
+# Run linting checks (200 char line length, includes pre-commit hooks)
+task lint
+
+# Format code automatically
+task fmt
+```
+
+#### 4. Pre-commit Hooks
+
+```bash
+# Update pre-commit hooks to latest versions
+task hooks:update
+
+# Run pre-commit hooks on all files
+task hooks:run
+```
+
+#### 5. Running the Demo
+
+```bash
+# Run the Bedrock model demo (requires AWS credentials)
+task demo
+
+# Or run directly with AWS profile
+AWS_PROFILE=your-profile-name task demo
+```
+
+#### 6. Cleanup
+
+```bash
+# Clean up temporary files and caches
+task clean
+```
+
+### Code Standards
+
+- **Line Length**: Maximum 200 characters
+- **Code Style**: Enforced by Ruff
+- **Test Coverage**: Minimum 80%
+- **Pre-commit Hooks**: Must pass before committing
+  - Trailing whitespace removal
+  - End of file fixing
+  - YAML/TOML validation
+  - Large file checks
+  - Merge conflict detection
+  - Private key detection
+  - Ruff linting and formatting
+  - Gitleaks (secret detection)
+
+### Important Guidelines
+
+#### Git Operations
+
+- **NEVER** use `git add .` or `git add` with wildcards
+- Always stage specific files explicitly
+- Confirm with user before:
+  - Staging files
+  - Creating branches
+  - Committing changes
+
+#### Code Changes
+
+- Run `task lint` before proposing changes
+- Ensure `task test:coverage` passes with ≥80% coverage
+- Follow existing code patterns and conventions
+- Maintain 200 character line length limit
+
+#### Testing
+
+- Write tests for all new functionality
+- Mock external AWS API calls
+- Use pytest fixtures appropriately
+- Test error handling paths
+
+### AWS Configuration
+
+The demo requires AWS credentials with Bedrock access:
+
+```bash
+# Set AWS profile
+export AWS_PROFILE=your-profile-name
+
+# Verify credentials
+aws sts get-caller-identity
+
+# Run demo
+task demo
+```
+
+### Models Tested
+
+The demo tests the following AWS Bedrock models:
+
+**Amazon Nova v1 Models:**
+- `amazon.nova-micro-v1:0` - Text-only, lowest latency
+- `amazon.nova-lite-v1:0` - Multimodal, cost-efficient
+- `amazon.nova-pro-v1:0` - High-performance multimodal
+- `amazon.nova-premier-v1:0` - Most capable, complex reasoning
+
+**Amazon Nova 2 Models:**
+- `amazon.nova-2-lite-v1:0` - Advanced reasoning with extended thinking
+- `amazon.nova-2-multimodal-embeddings-v1:0` - Unified embeddings
+
+**OpenAI GPT-5 Models:**
+- `openai.gpt-5.4` - Affordable, capable
+- `openai.gpt-5.5` - Advanced reasoning
+- `openai.gpt-5.6` - Latest flagship
+
+### Troubleshooting
+
+#### Test Failures
+
+```bash
+# Run tests with verbose output
+task test:coverage
+
+# Check specific test
+uv run pytest -v tests/test_bedrock_demo.py::TestClass::test_method
+```
+
+#### Linting Issues
+
+```bash
+# Auto-fix linting issues
+task fmt
+
+# Check specific files
+uv run ruff check bedrock_demo.py --line-length=200
+```
+
+#### Coverage Below 80%
+
+```bash
+# View coverage report
+task test:coverage
+# Open htmlcov/index.html to see detailed coverage report
+```
+
+#### Pre-commit Hook Failures
+
+```bash
+# Run hooks individually
+uv run pre-commit run trailing-whitespace --all-files
+uv run pre-commit run ruff --all-files
+uv run pre-commit run gitleaks --all-files
+
+# Update hooks if outdated
+task hooks:update
+```
+
+### Dependencies
+
+Core dependencies are managed via `uv` and defined in `pyproject.toml`:
+
+**Runtime:**
+- boto3 ≥1.35.0 (AWS SDK)
+- openai ≥1.55.0 (OpenAI SDK)
+
+**Development:**
+- pytest ≥8.0.0 (Testing framework)
+- pytest-cov ≥6.0.0 (Coverage reporting)
+- pytest-mock ≥3.12.0 (Mocking utilities)
+- ruff ≥0.6.0 (Linting and formatting)
+- pre-commit ≥4.0.0 (Git hooks)
+
+### License
+
+This project is licensed under MPL-2.0. See the LICENSE file for details.
+
+### Questions?
+
+If you encounter issues or need clarification:
+1. Check this AGENTS.md file
+2. Review README.md for user documentation
+3. Examine existing tests for patterns
+4. Check Taskfile.yml for available commands
