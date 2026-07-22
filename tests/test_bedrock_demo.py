@@ -5,7 +5,18 @@ from unittest.mock import MagicMock, patch
 
 from botocore.exceptions import ClientError
 
-from bedrock_demo import AWS_REGION, EMBEDDING_TEST_INPUT, MODEL_CATALOG, TEST_PROMPT, ResultsCollector, handle_error, run_nova_embeddings, run_nova_generation_models
+from bedrock_demo import (
+    AWS_REGION,
+    EMBEDDING_MODEL,
+    EMBEDDING_TEST_INPUT,
+    GENERATION_MODELS,
+    MODEL_CATALOG,
+    TEST_PROMPT,
+    ResultsCollector,
+    handle_error,
+    run_nova_embeddings,
+    run_nova_generation_models,
+)
 
 
 class TestResultsCollector:
@@ -81,105 +92,106 @@ class TestErrorHandling:
 class TestNovaGenerationModels:
     """Test Nova generation model testing function."""
 
-    @patch("bedrock_demo.boto3.client")
-    def test_successful_nova_generation(self, mock_boto_client, capsys):
+    def test_successful_nova_generation(self, capsys):
         """Test successful Nova generation model calls."""
         mock_bedrock = MagicMock()
-        mock_boto_client.return_value = mock_bedrock
-
         mock_bedrock.converse.return_value = {
             "output": {"message": {"content": [{"text": "AWS Bedrock is a fully managed service for foundation models."}]}},
             "usage": {"inputTokens": 10, "outputTokens": 15},
         }
 
         results = ResultsCollector()
-        run_nova_generation_models(results)
+        run_nova_generation_models(results, mock_bedrock)
 
-        assert len(results.successful) > 0
-        assert len(results.failed) >= 0
+        assert len(results.successful) == len(GENERATION_MODELS)
+        assert len(results.failed) == 0
 
         captured = capsys.readouterr()
         assert "TESTING NOVA GENERATION MODELS" in captured.out
 
-    @patch("bedrock_demo.boto3.client")
-    def test_nova_generation_access_denied(self, mock_boto_client, capsys):
+    def test_nova_generation_access_denied(self, capsys):
         """Test Nova generation with access denied error."""
         mock_bedrock = MagicMock()
-        mock_boto_client.return_value = mock_bedrock
-
         mock_bedrock.converse.side_effect = ClientError({"Error": {"Code": "AccessDeniedException", "Message": "Access denied"}}, "converse")
 
         results = ResultsCollector()
-        run_nova_generation_models(results)
+        run_nova_generation_models(results, mock_bedrock)
 
-        assert len(results.failed) == 4
+        assert len(results.failed) == len(GENERATION_MODELS)
         captured = capsys.readouterr()
         assert "AccessDeniedException" in captured.out
 
-    @patch("bedrock_demo.boto3.client")
-    def test_nova_generation_client_initialization_failure(self, mock_boto_client, capsys):
+    @patch("bedrock_demo.get_bedrock_client")
+    def test_nova_generation_client_initialization_failure(self, mock_get_client, capsys):
         """Test Nova generation with client initialization failure."""
-        mock_boto_client.side_effect = Exception("Failed to initialize client")
+        mock_get_client.side_effect = Exception("Failed to initialize client")
 
         results = ResultsCollector()
-        run_nova_generation_models(results)
+        mock_bedrock = MagicMock()
+        mock_bedrock.converse.side_effect = Exception("Failed to initialize client")
+        run_nova_generation_models(results, mock_bedrock)
 
-        assert len(results.failed) == 4
+        assert len(results.failed) == len(GENERATION_MODELS)
         captured = capsys.readouterr()
-        assert "Failed to initialize Bedrock client" in captured.out
+        assert "Unexpected error" in captured.out
 
 
 class TestNovaEmbeddings:
     """Test Nova embeddings model testing function."""
 
-    @patch("bedrock_demo.boto3.client")
-    def test_successful_embeddings(self, mock_boto_client, capsys):
+    def test_successful_embeddings(self, capsys):
         """Test successful embeddings generation."""
         mock_bedrock = MagicMock()
-        mock_boto_client.return_value = mock_bedrock
-
         mock_response = MagicMock()
         mock_response.__getitem__.return_value.read.return_value = json.dumps({"embedding": [0.1] * 1024}).encode("utf-8")
         mock_bedrock.invoke_model.return_value = mock_response
 
         results = ResultsCollector()
-        run_nova_embeddings(results)
+        run_nova_embeddings(results, mock_bedrock)
 
         assert len(results.successful) == 1
-        assert "amazon.nova-2-multimodal-embeddings-v1:0" in results.successful
+        assert EMBEDDING_MODEL in results.successful
 
         captured = capsys.readouterr()
         assert "TESTING EMBEDDINGS MODEL" in captured.out
         assert "Embedding generated successfully" in captured.out
         assert "Dimensions: 1024" in captured.out
 
-    @patch("bedrock_demo.boto3.client")
-    def test_embeddings_access_denied(self, mock_boto_client, capsys):
+    def test_successful_embeddings_plural_key(self, capsys):
+        """Test successful embeddings with plural 'embeddings' response key."""
+        mock_bedrock = MagicMock()
+        mock_response = MagicMock()
+        mock_response.__getitem__.return_value.read.return_value = json.dumps({"embeddings": [0.1] * 512}).encode("utf-8")
+        mock_bedrock.invoke_model.return_value = mock_response
+
+        results = ResultsCollector()
+        run_nova_embeddings(results, mock_bedrock)
+
+        assert len(results.successful) == 1
+        captured = capsys.readouterr()
+        assert "Dimensions: 512" in captured.out
+
+    def test_embeddings_access_denied(self, capsys):
         """Test embeddings with access denied error."""
         mock_bedrock = MagicMock()
-        mock_boto_client.return_value = mock_bedrock
-
         mock_bedrock.invoke_model.side_effect = ClientError({"Error": {"Code": "AccessDeniedException", "Message": "Access denied"}}, "invoke_model")
 
         results = ResultsCollector()
-        run_nova_embeddings(results)
+        run_nova_embeddings(results, mock_bedrock)
 
         assert len(results.failed) == 1
         captured = capsys.readouterr()
         assert "AccessDeniedException" in captured.out
 
-    @patch("bedrock_demo.boto3.client")
-    def test_embeddings_unexpected_response(self, mock_boto_client, capsys):
+    def test_embeddings_unexpected_response(self, capsys):
         """Test embeddings with unexpected response format."""
         mock_bedrock = MagicMock()
-        mock_boto_client.return_value = mock_bedrock
-
         mock_response = MagicMock()
         mock_response.__getitem__.return_value.read.return_value = json.dumps({"unexpected_field": "value"}).encode("utf-8")
         mock_bedrock.invoke_model.return_value = mock_response
 
         results = ResultsCollector()
-        run_nova_embeddings(results)
+        run_nova_embeddings(results, mock_bedrock)
 
         assert len(results.failed) == 1
         captured = capsys.readouterr()
@@ -195,7 +207,7 @@ class TestModelCatalog:
             "amazon.nova-micro-v1:0",
             "amazon.nova-lite-v1:0",
             "amazon.nova-pro-v1:0",
-            "amazon.nova-2-lite-v1:0",
+            "us.amazon.nova-2-lite-v1:0",
             "amazon.nova-2-multimodal-embeddings-v1:0",
         ]
 
@@ -209,6 +221,7 @@ class TestModelCatalog:
     def test_model_catalog_excludes_removed_models(self):
         """Test that removed models are not in the catalog."""
         assert "amazon.nova-premier-v1:0" not in MODEL_CATALOG
+        assert "amazon.nova-2-lite-v1:0" not in MODEL_CATALOG
         assert "openai.gpt-5.4" not in MODEL_CATALOG
         assert "openai.gpt-5.5" not in MODEL_CATALOG
         assert "openai.gpt-5.6" not in MODEL_CATALOG
@@ -222,6 +235,16 @@ class TestModelCatalog:
             assert isinstance(info["description"], str)
             assert len(info["name"]) > 0
             assert len(info["description"]) > 0
+
+    def test_generation_models_derived_from_catalog(self):
+        """Test that GENERATION_MODELS are derived from catalog and exclude embeddings."""
+        assert "amazon.nova-2-multimodal-embeddings-v1:0" not in GENERATION_MODELS
+        assert all(MODEL_CATALOG[m]["type"] != "Embeddings" for m in GENERATION_MODELS)
+
+    def test_embedding_model_derived_from_catalog(self):
+        """Test that EMBEDDING_MODEL is the sole embeddings entry in catalog."""
+        assert EMBEDDING_MODEL == "amazon.nova-2-multimodal-embeddings-v1:0"
+        assert MODEL_CATALOG[EMBEDDING_MODEL]["type"] == "Embeddings"
 
 
 class TestConstants:

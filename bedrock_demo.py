@@ -31,7 +31,7 @@ MODEL_CATALOG = {
         "context": "300K tokens | Max output: 5K",
         "description": "Amazon's balanced multimodal model offering strong accuracy, speed, and cost across text, images, and video. Best price-performance for most enterprise tasks. Knowledge cutoff: Oct 2024. Launched: Dec 2024.",
     },
-    "amazon.nova-2-lite-v1:0": {
+    "us.amazon.nova-2-lite-v1:0": {
         "name": "Amazon Nova 2 Lite",
         "type": "Multimodal Generation",
         "context": "1M tokens | Max output: 64K",
@@ -45,6 +45,8 @@ MODEL_CATALOG = {
     },
 }
 
+GENERATION_MODELS = [k for k, v in MODEL_CATALOG.items() if v["type"] != "Embeddings"]
+EMBEDDING_MODEL = next(k for k, v in MODEL_CATALOG.items() if v["type"] == "Embeddings")
 
 AWS_REGION = "us-east-1"
 TEST_PROMPT = "Explain AWS Bedrock in one sentence."
@@ -63,6 +65,11 @@ class ResultsCollector:
 
     def add_failure(self, model_id: str, error: str):
         self.failed.append({"model": model_id, "error": error})
+
+
+def get_bedrock_client():
+    """Create and return a Bedrock runtime client."""
+    return boto3.client(service_name="bedrock-runtime", region_name=AWS_REGION)
 
 
 def print_banner():
@@ -107,24 +114,14 @@ def handle_error(error: Exception, model_id: str) -> str:
         return f"Unexpected error - {str(error)}"
 
 
-def run_nova_generation_models(results: ResultsCollector):
+def run_nova_generation_models(results: ResultsCollector, bedrock):
     """Test Amazon Nova generation models using Converse API."""
     print("═" * 67)
     print("🧪 TESTING NOVA GENERATION MODELS")
     print("═" * 67 + "\n")
 
-    generation_models = ["amazon.nova-micro-v1:0", "amazon.nova-lite-v1:0", "amazon.nova-pro-v1:0", "us.amazon.nova-2-lite-v1:0"]
-
-    try:
-        bedrock = boto3.client(service_name="bedrock-runtime", region_name=AWS_REGION)
-    except Exception as e:
-        print(f"✗ Failed to initialize Bedrock client: {e}\n")
-        for model_id in generation_models:
-            results.add_failure(model_id, f"Client initialization failed: {e}")
-        return
-
-    for idx, model_id in enumerate(generation_models, 1):
-        print(f"[{idx}/{len(generation_models)}] Testing {model_id}...")
+    for idx, model_id in enumerate(GENERATION_MODELS, 1):
+        print(f"[{idx}/{len(GENERATION_MODELS)}] Testing {model_id}...")
 
         try:
             start_time = time.time()
@@ -149,20 +146,13 @@ def run_nova_generation_models(results: ResultsCollector):
             results.add_failure(model_id, error_msg)
 
 
-def run_nova_embeddings(results: ResultsCollector):
+def run_nova_embeddings(results: ResultsCollector, bedrock):
     """Test Amazon Nova Multimodal Embeddings model."""
     print("═" * 67)
     print("🔢 TESTING EMBEDDINGS MODEL")
     print("═" * 67 + "\n")
 
-    model_id = "amazon.nova-2-multimodal-embeddings-v1:0"
-
-    try:
-        bedrock = boto3.client(service_name="bedrock-runtime", region_name=AWS_REGION)
-    except Exception as e:
-        print(f"✗ Failed to initialize Bedrock client: {e}\n")
-        results.add_failure(model_id, f"Client initialization failed: {e}")
-        return
+    model_id = EMBEDDING_MODEL
 
     print(f"[1/1] Testing {model_id}...")
 
@@ -180,19 +170,13 @@ def run_nova_embeddings(results: ResultsCollector):
 
         response_body = json.loads(response["body"].read())
 
-        if "embedding" in response_body:
-            embedding_dims = len(response_body["embedding"])
+        embedding_key = "embedding" if "embedding" in response_body else "embeddings" if "embeddings" in response_body else None
+
+        if embedding_key:
+            embedding_dims = len(response_body[embedding_key])
             print("✓ Embedding generated successfully")
             print(f"📐 Dimensions: {embedding_dims}")
             print(f"⏱️  Latency: {elapsed_time:.2f}s\n")
-
-            results.add_success(model_id, elapsed_time)
-        elif "embeddings" in response_body:
-            embedding_dims = len(response_body["embeddings"])
-            print("✓ Embedding generated successfully")
-            print(f"📐 Dimensions: {embedding_dims}")
-            print(f"⏱️  Latency: {elapsed_time:.2f}s\n")
-
             results.add_success(model_id, elapsed_time)
         else:
             error_msg = f"Unexpected response format - no embedding found. Response keys: {list(response_body.keys())}"
@@ -237,8 +221,17 @@ def main():
 
     results = ResultsCollector()
 
-    run_nova_generation_models(results)
-    run_nova_embeddings(results)
+    try:
+        bedrock = get_bedrock_client()
+    except Exception as e:
+        print(f"✗ Failed to initialize Bedrock client: {e}\n")
+        for model_id in MODEL_CATALOG:
+            results.add_failure(model_id, f"Client initialization failed: {e}")
+        print_summary(results)
+        sys.exit(1)
+
+    run_nova_generation_models(results, bedrock)
+    run_nova_embeddings(results, bedrock)
 
     print_summary(results)
 
