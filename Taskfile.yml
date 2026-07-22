@@ -5,12 +5,33 @@ vars:
   PYTEST: uv run pytest
   RUFF: uv run ruff
   PRECOMMIT: uv run pre-commit
+  AWS_REGION: us-east-1
 
 tasks:
   demo:
-    desc: Run the Bedrock model demo
+    desc: Run the Bedrock Nova model demo
     cmds:
       - "{{.PYTHON}} bedrock_demo.py"
+
+  demo:agentcore:setup:
+    desc: Create IAM execution role for AgentCore Harness demo
+    cmds:
+      - bash scripts/create_agentcore_role.sh
+
+  demo:agentcore:
+    desc: Run the AgentCore Harness demo (requires AGENTCORE_EXECUTION_ROLE_ARN)
+    cmds:
+      - "{{.PYTHON}} agentcore_demo.py"
+
+  demo:agentcore:keep:
+    desc: Run AgentCore Harness demo and keep the harness after invocation
+    cmds:
+      - "{{.PYTHON}} agentcore_demo.py --keep"
+
+  demo:agentcore:delete:
+    desc: Delete all demo harnesses matching the name prefix
+    cmds:
+      - bash scripts/delete_agentcore_harnesses.sh
 
   test:
     desc: Run all tests

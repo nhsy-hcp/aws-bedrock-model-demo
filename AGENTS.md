@@ -8,9 +8,11 @@ This file provides guidance for AI agents working on the `bedrock-model-demo` pr
 
 ```
 bedrock-model-demo/
-├── bedrock_demo.py          # Main demo script
+├── bedrock_demo.py          # Nova model demo script
+├── agentcore_demo.py        # AgentCore Harness demo script
 ├── tests/
-│   └── test_bedrock_demo.py # Unit tests
+│   ├── test_bedrock_demo.py    # Unit tests for Nova demo
+│   └── test_agentcore_demo.py  # Unit tests for AgentCore demo
 ├── pyproject.toml           # Python dependencies and configuration
 ├── Taskfile.yml             # Task automation
 ├── .pre-commit-config.yaml  # Pre-commit hooks configuration
@@ -58,11 +60,23 @@ task hooks:update
 task hooks:run
 ```
 
-#### 5. Running the Demo
+#### 5. Running the Demos
 
 ```bash
-# Run the Bedrock model demo (requires AWS credentials)
+# Run the Nova model demo (requires AWS credentials)
 task demo
+
+# Create IAM execution role for AgentCore (one-time setup)
+task demo:agentcore:setup
+
+# Run the AgentCore Harness demo (requires AGENTCORE_EXECUTION_ROLE_ARN)
+task demo:agentcore
+
+# Run AgentCore demo and keep harness after invocation
+task demo:agentcore:keep
+
+# Delete all demo harnesses (cleanup)
+task demo:agentcore:delete
 
 # Or run directly with AWS profile
 AWS_PROFILE=your-profile-name task demo
@@ -148,6 +162,12 @@ The demo tests the following AWS Bedrock models:
 **Amazon Nova 2 Models:**
 - `us.amazon.nova-2-lite-v1:0` - Multimodal, 1M context, 64K output. Extended thinking, web grounding, code interpreter. Geo cross-region inference profile (launched Dec 2025)
 - `amazon.nova-2-multimodal-embeddings-v1:0` - Unified embeddings for text, images, documents, video, audio. Dimensions: 3072/1024/384/256 (launched Oct 2025)
+
+**AgentCore Harness:**
+- Uses `amazon.nova-pro-v1:0` as the backing model
+- Managed agent loop with streaming responses
+- Requires `AGENTCORE_EXECUTION_ROLE_ARN` environment variable (IAM role trusted by `bedrock-agentcore.amazonaws.com`)
+- Flow: create harness, poll until READY, invoke with streaming, delete harness
 
 ### Troubleshooting
 

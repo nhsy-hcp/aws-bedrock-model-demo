@@ -3,6 +3,7 @@
 Simple Python script to test AWS Bedrock models including:
 - Amazon Nova v1 family (Micro, Lite, Pro)
 - Amazon Nova 2 models (Lite, Multimodal Embeddings)
+- AgentCore Harness demo using Amazon Nova Pro
 
 ## Prerequisites
 
@@ -26,14 +27,64 @@ AWS_PROFILE=your-profile-name uv run python bedrock_demo.py
 Or use the Taskfile:
 
 ```bash
-# Run the demo
+# Run the Nova model demo
 task demo
+
+# Run the AgentCore Harness demo
+task demo:agentcore
 
 # Run tests
 task test
 
 # Run linting and formatting
 task lint
+```
+
+## AgentCore Harness Demo
+
+The AgentCore demo creates a managed Harness backed by Amazon Nova Pro, invokes it with a prompt, streams the response, then tears down the harness automatically.
+
+### Prerequisites
+
+Create an IAM role with the following trust policy:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [{
+    "Effect": "Allow",
+    "Principal": {"Service": "bedrock-agentcore.amazonaws.com"},
+    "Action": "sts:AssumeRole"
+  }]
+}
+```
+
+And attach a permissions policy including at minimum:
+- `bedrock:InvokeModel`
+- `logs:CreateLogGroup`, `logs:CreateLogStream`, `logs:PutLogEvents`
+
+Then export the role ARN:
+
+```bash
+export AGENTCORE_EXECUTION_ROLE_ARN=arn:aws:iam::<account>:role/<role-name>
+task demo:agentcore
+```
+
+### Taskfile commands
+
+```bash
+# One-time IAM role setup (creates bedrock-agentcore-demo-role)
+task demo:agentcore:setup
+
+# Export the printed role ARN, then run the demo
+export AGENTCORE_EXECUTION_ROLE_ARN=arn:aws:iam::<account>:role/bedrock-agentcore-demo-role
+task demo:agentcore
+
+# Run demo and keep harness after invocation
+task demo:agentcore:keep
+
+# Delete all demo harnesses (cleanup after --keep)
+task demo:agentcore:delete
 ```
 
 ## Development
