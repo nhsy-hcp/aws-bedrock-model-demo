@@ -19,14 +19,14 @@ tasks:
       - bash scripts/create_agentcore_role.sh
 
   demo:agentcore:
-    desc: Run the AgentCore Harness demo (requires AGENTCORE_EXECUTION_ROLE_ARN)
+    desc: Run the AgentCore Harness demo (requires AGENTCORE_EXECUTION_ROLE_ARN) - harness is kept for reuse
     cmds:
       - "{{.PYTHON}} agentcore_demo.py"
 
-  demo:agentcore:keep:
-    desc: Run AgentCore Harness demo and keep the harness after invocation
+  demo:agentcore:run:delete:
+    desc: Run AgentCore Harness demo and delete harness after invocation
     cmds:
-      - "{{.PYTHON}} agentcore_demo.py --keep"
+      - "{{.PYTHON}} agentcore_demo.py --delete"
 
   demo:agentcore:delete:
     desc: Delete all demo harnesses matching the name prefix

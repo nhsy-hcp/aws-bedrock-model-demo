@@ -26,35 +26,32 @@ from botocore.exceptions import ClientError
 
 AWS_REGION = "us-east-1"
 HARNESS_MODEL_ID = "amazon.nova-pro-v1:0"
-HARNESS_NAME_PREFIX = "bedrock-model-demo-harness"
+HARNESS_NAME = "BedrockModelDemoHarness"
 POLL_INTERVAL_SECONDS = 3
-POLL_TIMEOUT_SECONDS = 120
+POLL_TIMEOUT_SECONDS = 300
 TEST_PROMPT = "Explain AWS Bedrock AgentCore in two sentences, focusing on what problems it solves for developers."
 
 
+EXECUTION_ROLE_NAME = "bedrock-agentcore-demo-role"
+
+
 def get_execution_role_arn() -> str:
-    """Read execution role ARN from environment."""
+    """Resolve execution role ARN from env var or derive from current account."""
     role_arn = os.environ.get("AGENTCORE_EXECUTION_ROLE_ARN", "")
-    if not role_arn:
-        print("\n╔══════════════════════════════════════════════════════════════════╗")
-        print("║  AGENTCORE_EXECUTION_ROLE_ARN not set                            ║")
-        print("╚══════════════════════════════════════════════════════════════════╝")
-        print("\nCreate an IAM role with the following trust policy:")
-        print("""  {
-    "Version": "2012-10-17",
-    "Statement": [{
-      "Effect": "Allow",
-      "Principal": {"Service": "bedrock-agentcore.amazonaws.com"},
-      "Action": "sts:AssumeRole"
-    }]
-  }""")
-        print("\nAnd attach a policy with at minimum:")
-        print("  bedrock:InvokeModel")
-        print("  logs:CreateLogGroup, logs:CreateLogStream, logs:PutLogEvents")
-        print("\nThen set:")
-        print("  export AGENTCORE_EXECUTION_ROLE_ARN=arn:aws:iam::<account>:role/<role-name>")
+    if role_arn:
+        return role_arn
+
+    try:
+        sts = boto3.client("sts", region_name=AWS_REGION)
+        account_id = sts.get_caller_identity()["Account"]
+        derived = f"arn:aws:iam::{account_id}:role/{EXECUTION_ROLE_NAME}"
+        print(f"    Role: {derived} (auto-derived)")
+        return derived
+    except Exception as e:
+        print(f"\n✗ Could not determine AWS account ID: {e}")
+        print("  Run: task demo:agentcore:setup")
+        print(f"  Then: export AGENTCORE_EXECUTION_ROLE_ARN=arn:aws:iam::<account>:role/{EXECUTION_ROLE_NAME}")
         sys.exit(1)
-    return role_arn
 
 
 def print_banner():
@@ -84,13 +81,24 @@ def handle_error(error: Exception) -> str:
     return f"Unexpected error - {str(error)}"
 
 
-def create_harness(control_client, role_arn: str) -> str:
-    """Create an AgentCore Harness and return its ARN."""
-    harness_name = f"{HARNESS_NAME_PREFIX}-{uuid.uuid4().hex[:8]}"
-    print(f"[1/4] Creating harness: {harness_name}...")
+def get_or_create_harness(control_client, role_arn: str) -> tuple[str, str, bool]:
+    """Return (harness_arn, harness_id, created). Reuses existing harness if found and alive."""
+    response = control_client.list_harnesses()
+    for h in response.get("harnesses", []):
+        if h["harnessName"] == HARNESS_NAME:
+            try:
+                detail = control_client.get_harness(harnessId=h["harnessId"])
+                status = detail["harness"]["status"]
+                if status not in ("DELETING", "DELETE_FAILED"):
+                    print(f"[1/4] Reusing existing harness: {HARNESS_NAME} (status: {status})")
+                    print(f"    ARN: {h['arn']}")
+                    return h["arn"], h["harnessId"], False
+            except ClientError:
+                pass
 
+    print(f"[1/4] Creating harness: {HARNESS_NAME}...")
     response = control_client.create_harness(
-        harnessName=harness_name,
+        harnessName=HARNESS_NAME,
         executionRoleArn=role_arn,
         model={
             "bedrockModelConfig": {
@@ -101,11 +109,10 @@ def create_harness(control_client, role_arn: str) -> str:
         },
         systemPrompt=[{"text": "You are a helpful AWS assistant. Be concise and accurate."}],
     )
-
-    harness_arn = response["harnessArn"]
-    harness_id = response["harnessId"]
+    harness_arn = response["harness"]["arn"]
+    harness_id = response["harness"]["harnessId"]
     print(f"    ARN: {harness_arn}")
-    return harness_arn, harness_id
+    return harness_arn, harness_id, True
 
 
 def wait_for_ready(control_client, harness_id: str) -> None:
@@ -115,7 +122,7 @@ def wait_for_ready(control_client, harness_id: str) -> None:
 
     while time.time() < deadline:
         response = control_client.get_harness(harnessId=harness_id)
-        status = response["status"]
+        status = response["harness"]["status"]
 
         if status == "READY":
             print(" ✓")
@@ -150,6 +157,9 @@ def invoke_harness(runtime_client, harness_arn: str) -> tuple[str, float]:
     full_text = []
     print("    ", end="", flush=True)
 
+    input_tokens = 0
+    output_tokens = 0
+
     for event in response["stream"]:
         if "contentBlockDelta" in event:
             delta = event["contentBlockDelta"].get("delta", {})
@@ -157,14 +167,27 @@ def invoke_harness(runtime_client, harness_arn: str) -> tuple[str, float]:
                 chunk = delta["text"]
                 full_text.append(chunk)
                 print(chunk, end="", flush=True)
+        elif "metadata" in event:
+            usage = event["metadata"].get("usage", {})
+            input_tokens = usage.get("inputTokens", 0)
+            output_tokens = usage.get("outputTokens", 0)
         elif "runtimeClientError" in event:
             error_msg = event["runtimeClientError"].get("message", "Unknown stream error")
+            print(f"\n✗ Stream error: {error_msg}")
+            sys.exit(1)
+        elif "internalServerException" in event:
+            error_msg = event["internalServerException"].get("message", "Internal server error")
+            print(f"\n✗ Stream error: {error_msg}")
+            sys.exit(1)
+        elif "validationException" in event:
+            error_msg = event["validationException"].get("message", "Validation error")
             print(f"\n✗ Stream error: {error_msg}")
             sys.exit(1)
 
     elapsed = time.time() - start_time
     print("\n    " + "─" * 60)
     print(f"\n⏱️  Latency: {elapsed:.2f}s")
+    print(f"📊 Input tokens: {input_tokens}, Output tokens: {output_tokens}")
     return "".join(full_text), elapsed
 
 
@@ -181,7 +204,7 @@ def delete_harness(control_client, harness_id: str) -> None:
 
 def main():
     """Main execution function."""
-    keep = "--keep" in sys.argv
+    delete = "--delete" in sys.argv
 
     print_banner()
 
@@ -192,20 +215,26 @@ def main():
 
     harness_arn = None
     harness_id = None
+    created = False
 
     try:
-        harness_arn, harness_id = create_harness(control_client, role_arn)
+        harness_arn, harness_id, created = get_or_create_harness(control_client, role_arn)
         wait_for_ready(control_client, harness_id)
         response_text, latency = invoke_harness(runtime_client, harness_arn)
 
-        print("\n═" * 67)
+        print("\n" + "═" * 67)
         print("📊 SUMMARY")
         print("═" * 67)
+        print(f"✓ Harness:      {HARNESS_NAME} ({'new' if created else 'reused'})")
         print(f"✓ Harness ARN:  {harness_arn}")
         print(f"✓ Model:        {HARNESS_MODEL_ID}")
         print(f"✓ Latency:      {latency:.2f}s")
-        print(f"✓ Response:     {response_text[:120]}{'...' if len(response_text) > 120 else ''}")
         print("═" * 67 + "\n")
+
+        if delete:
+            delete_harness(control_client, harness_id)
+        else:
+            print("💡 Harness kept for reuse. To delete: task demo:agentcore:delete")
 
     except TimeoutError as e:
         print(f"\n✗ {e}")
@@ -213,11 +242,6 @@ def main():
     except Exception as e:
         print(f"\n✗ Error: {handle_error(e)}")
         sys.exit(1)
-    finally:
-        if harness_id and not keep:
-            delete_harness(control_client, harness_id)
-        elif keep and harness_id:
-            print(f"\n💡 Harness kept. To delete manually:\n   aws bedrock-agentcore-control delete-harness --harness-id {harness_id} --region {AWS_REGION}")
 
 
 if __name__ == "__main__":

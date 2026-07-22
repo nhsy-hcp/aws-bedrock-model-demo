@@ -66,16 +66,16 @@ task hooks:run
 # Run the Nova model demo (requires AWS credentials)
 task demo
 
-# Create IAM execution role for AgentCore (one-time setup)
+# One-time IAM role setup (creates bedrock-agentcore-demo-role)
 task demo:agentcore:setup
 
-# Run the AgentCore Harness demo (requires AGENTCORE_EXECUTION_ROLE_ARN)
+# Run the AgentCore Harness demo - no env var needed after setup
 task demo:agentcore
 
-# Run AgentCore demo and keep harness after invocation
-task demo:agentcore:keep
+# Run AgentCore demo and delete harness after invocation
+task demo:agentcore:run:delete
 
-# Delete all demo harnesses (cleanup)
+# Delete all demo harnesses
 task demo:agentcore:delete
 
 # Or run directly with AWS profile
@@ -167,8 +167,9 @@ The demo tests the following AWS Bedrock models:
 **AgentCore Harness:**
 - Uses `amazon.nova-pro-v1:0` as the backing model
 - Managed agent loop with streaming responses
-- Requires `AGENTCORE_EXECUTION_ROLE_ARN` environment variable (IAM role trusted by `bedrock-agentcore.amazonaws.com`)
-- Flow: create harness, poll until READY, invoke with streaming, delete harness
+- Role ARN auto-derived from active AWS credentials using `bedrock-agentcore-demo-role` — no env var required after `task demo:agentcore:setup`
+- Harness is created once and reused across runs; deleted only via `task demo:agentcore:delete`
+- Flow: get-or-create harness, poll until READY, invoke with streaming
 
 ### Troubleshooting
 

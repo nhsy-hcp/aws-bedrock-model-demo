@@ -5,25 +5,49 @@ from unittest.mock import MagicMock, patch
 import pytest
 from botocore.exceptions import ClientError
 
-from agentcore_demo import AWS_REGION, HARNESS_MODEL_ID, TEST_PROMPT, create_harness, delete_harness, get_execution_role_arn, handle_error, invoke_harness, wait_for_ready
+from agentcore_demo import (
+    AWS_REGION,
+    EXECUTION_ROLE_NAME,
+    HARNESS_MODEL_ID,
+    HARNESS_NAME,
+    TEST_PROMPT,
+    delete_harness,
+    get_execution_role_arn,
+    get_or_create_harness,
+    handle_error,
+    invoke_harness,
+    wait_for_ready,
+)
 
 
 class TestGetExecutionRoleArn:
     """Test execution role ARN retrieval."""
 
-    def test_returns_arn_when_set(self, monkeypatch):
-        """Test that ARN is returned when env var is set."""
+    def test_returns_env_var_when_set(self, monkeypatch):
+        """Test that env var takes precedence."""
         monkeypatch.setenv("AGENTCORE_EXECUTION_ROLE_ARN", "arn:aws:iam::123456789012:role/MyRole")
         assert get_execution_role_arn() == "arn:aws:iam::123456789012:role/MyRole"
 
-    def test_exits_when_not_set(self, monkeypatch, capsys):
-        """Test that sys.exit(1) is called when env var is missing."""
+    def test_derives_from_account_when_env_not_set(self, monkeypatch):
+        """Test that ARN is derived from STS when env var is absent."""
         monkeypatch.delenv("AGENTCORE_EXECUTION_ROLE_ARN", raising=False)
-        with pytest.raises(SystemExit) as exc:
-            get_execution_role_arn()
+        with patch("agentcore_demo.boto3.client") as mock_boto:
+            mock_sts = MagicMock()
+            mock_sts.get_caller_identity.return_value = {"Account": "123456789012"}
+            mock_boto.return_value = mock_sts
+            arn = get_execution_role_arn()
+        assert arn == f"arn:aws:iam::123456789012:role/{EXECUTION_ROLE_NAME}"
+
+    def test_exits_when_sts_fails(self, monkeypatch, capsys):
+        """Test that sys.exit(1) is called when STS lookup fails."""
+        monkeypatch.delenv("AGENTCORE_EXECUTION_ROLE_ARN", raising=False)
+        with patch("agentcore_demo.boto3.client") as mock_boto:
+            mock_sts = MagicMock()
+            mock_sts.get_caller_identity.side_effect = Exception("No credentials")
+            mock_boto.return_value = mock_sts
+            with pytest.raises(SystemExit) as exc:
+                get_execution_role_arn()
         assert exc.value.code == 1
-        captured = capsys.readouterr()
-        assert "AGENTCORE_EXECUTION_ROLE_ARN" in captured.out
 
 
 class TestHandleError:
@@ -63,28 +87,48 @@ class TestHandleError:
         assert "Something broke" in result
 
 
-class TestCreateHarness:
-    """Test harness creation."""
+class TestGetOrCreateHarness:
+    """Test harness get-or-create logic."""
 
-    def test_successful_create(self, capsys):
-        """Test successful harness creation."""
+    def test_creates_when_none_exist(self, capsys):
+        """Test that a new harness is created when none exist."""
         mock_client = MagicMock()
+        mock_client.list_harnesses.return_value = {"harnesses": []}
         mock_client.create_harness.return_value = {
-            "harnessArn": "arn:aws:bedrock-agentcore:us-east-1:123456789012:harness/test-abc123",
-            "harnessId": "test-abc123",
+            "harness": {
+                "arn": "arn:aws:bedrock-agentcore:us-east-1:123456789012:harness/test-abc123",
+                "harnessId": "test-abc123",
+            }
         }
 
-        arn, harness_id = create_harness(mock_client, "arn:aws:iam::123456789012:role/MyRole")
+        arn, harness_id, created = get_or_create_harness(mock_client, "arn:aws:iam::123456789012:role/MyRole")
 
         assert arn == "arn:aws:bedrock-agentcore:us-east-1:123456789012:harness/test-abc123"
         assert harness_id == "test-abc123"
-
+        assert created is True
+        mock_client.create_harness.assert_called_once()
         call_kwargs = mock_client.create_harness.call_args[1]
-        assert call_kwargs["executionRoleArn"] == "arn:aws:iam::123456789012:role/MyRole"
+        assert call_kwargs["harnessName"] == HARNESS_NAME
         assert call_kwargs["model"]["bedrockModelConfig"]["modelId"] == HARNESS_MODEL_ID
 
+    def test_reuses_existing_harness(self, capsys):
+        """Test that an existing harness is reused without creating a new one."""
+        mock_client = MagicMock()
+        mock_client.list_harnesses.return_value = {
+            "harnesses": [
+                {"harnessName": HARNESS_NAME, "arn": "arn:aws:bedrock-agentcore:us-east-1:123456789012:harness/existing-abc", "harnessId": "existing-abc"},
+            ]
+        }
+
+        arn, harness_id, created = get_or_create_harness(mock_client, "arn:aws:iam::123456789012:role/MyRole")
+
+        assert arn == "arn:aws:bedrock-agentcore:us-east-1:123456789012:harness/existing-abc"
+        assert harness_id == "existing-abc"
+        assert created is False
+        mock_client.create_harness.assert_not_called()
+
         captured = capsys.readouterr()
-        assert "Creating harness" in captured.out
+        assert "Reusing" in captured.out
 
 
 class TestWaitForReady:
@@ -93,7 +137,7 @@ class TestWaitForReady:
     def test_immediately_ready(self, capsys):
         """Test harness that is immediately READY."""
         mock_client = MagicMock()
-        mock_client.get_harness.return_value = {"status": "READY"}
+        mock_client.get_harness.return_value = {"harness": {"status": "READY"}}
 
         wait_for_ready(mock_client, "test-abc123")
 
@@ -103,9 +147,9 @@ class TestWaitForReady:
         """Test harness that becomes READY after a few polls."""
         mock_client = MagicMock()
         mock_client.get_harness.side_effect = [
-            {"status": "CREATING"},
-            {"status": "CREATING"},
-            {"status": "READY"},
+            {"harness": {"status": "CREATING"}},
+            {"harness": {"status": "CREATING"}},
+            {"harness": {"status": "READY"}},
         ]
 
         with patch("agentcore_demo.time.sleep"):
@@ -116,7 +160,7 @@ class TestWaitForReady:
     def test_failed_status_exits(self, capsys):
         """Test that FAILED status causes sys.exit(1)."""
         mock_client = MagicMock()
-        mock_client.get_harness.return_value = {"status": "FAILED"}
+        mock_client.get_harness.return_value = {"harness": {"status": "FAILED"}}
 
         with pytest.raises(SystemExit) as exc:
             wait_for_ready(mock_client, "test-abc123")
@@ -125,9 +169,9 @@ class TestWaitForReady:
     def test_timeout_raises(self):
         """Test that timeout raises TimeoutError."""
         mock_client = MagicMock()
-        mock_client.get_harness.return_value = {"status": "CREATING"}
+        mock_client.get_harness.return_value = {"harness": {"status": "CREATING"}}
 
-        with patch("agentcore_demo.time.sleep"), patch("agentcore_demo.time.time", side_effect=[0, 0, 200]):
+        with patch("agentcore_demo.time.sleep"), patch("agentcore_demo.time.time", side_effect=[0, 10, 10, 400]):
             with pytest.raises(TimeoutError):
                 wait_for_ready(mock_client, "test-abc123")
 
@@ -142,6 +186,7 @@ class TestInvokeHarness:
             "stream": [
                 {"contentBlockDelta": {"delta": {"text": "AgentCore "}}},
                 {"contentBlockDelta": {"delta": {"text": "is great."}}},
+                {"metadata": {"usage": {"inputTokens": 10, "outputTokens": 5}}},
                 {"messageStop": {"stopReason": "end_turn"}},
             ]
         }
@@ -209,6 +254,10 @@ class TestConstants:
 
     def test_model_id(self):
         assert HARNESS_MODEL_ID == "amazon.nova-pro-v1:0"
+
+    def test_harness_name(self):
+        assert HARNESS_NAME == "BedrockModelDemoHarness"
+        assert "-" not in HARNESS_NAME
 
     def test_prompt_defined(self):
         assert isinstance(TEST_PROMPT, str)

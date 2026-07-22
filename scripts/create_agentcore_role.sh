@@ -34,8 +34,17 @@ PERMISSIONS_POLICY=$(cat <<EOF
     {
       "Sid": "BedrockInvoke",
       "Effect": "Allow",
-      "Action": "bedrock:InvokeModel",
+      "Action": [
+        "bedrock:InvokeModel",
+        "bedrock:InvokeModelWithResponseStream"
+      ],
       "Resource": "arn:aws:bedrock:${REGION}::foundation-model/amazon.nova-pro-v1:0"
+    },
+    {
+      "Sid": "AgentCoreMemory",
+      "Effect": "Allow",
+      "Action": "bedrock-agentcore:*",
+      "Resource": "arn:aws:bedrock-agentcore:${REGION}:${ACCOUNT_ID}:memory/*"
     },
     {
       "Sid": "Logs",

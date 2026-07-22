@@ -1,6 +1,6 @@
 # AWS Bedrock Model Testing Demonstrator
 
-Simple Python script to test AWS Bedrock models including:
+Python scripts to test AWS Bedrock models and AgentCore:
 - Amazon Nova v1 family (Micro, Lite, Pro)
 - Amazon Nova 2 models (Lite, Multimodal Embeddings)
 - AgentCore Harness demo using Amazon Nova Pro
@@ -21,12 +21,6 @@ uv sync
 ## Usage
 
 ```bash
-AWS_PROFILE=your-profile-name uv run python bedrock_demo.py
-```
-
-Or use the Taskfile:
-
-```bash
 # Run the Nova model demo
 task demo
 
@@ -42,48 +36,27 @@ task lint
 
 ## AgentCore Harness Demo
 
-The AgentCore demo creates a managed Harness backed by Amazon Nova Pro, invokes it with a prompt, streams the response, then tears down the harness automatically.
+Creates a managed Harness backed by Amazon Nova Pro, invokes it with a prompt, streams the response, then keeps the harness for reuse on subsequent runs.
 
-### Prerequisites
+### One-time setup
 
-Create an IAM role with the following trust policy:
-
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [{
-    "Effect": "Allow",
-    "Principal": {"Service": "bedrock-agentcore.amazonaws.com"},
-    "Action": "sts:AssumeRole"
-  }]
-}
-```
-
-And attach a permissions policy including at minimum:
-- `bedrock:InvokeModel`
-- `logs:CreateLogGroup`, `logs:CreateLogStream`, `logs:PutLogEvents`
-
-Then export the role ARN:
+Run this once to create the required IAM execution role:
 
 ```bash
-export AGENTCORE_EXECUTION_ROLE_ARN=arn:aws:iam::<account>:role/<role-name>
-task demo:agentcore
-```
-
-### Taskfile commands
-
-```bash
-# One-time IAM role setup (creates bedrock-agentcore-demo-role)
 task demo:agentcore:setup
+```
 
-# Export the printed role ARN, then run the demo
-export AGENTCORE_EXECUTION_ROLE_ARN=arn:aws:iam::<account>:role/bedrock-agentcore-demo-role
+This creates `bedrock-agentcore-demo-role` in your AWS account. The role ARN is then auto-derived from your active AWS credentials on every subsequent run — no environment variables needed.
+
+### Running the demo
+
+```bash
 task demo:agentcore
+```
 
-# Run demo and keep harness after invocation
-task demo:agentcore:keep
+The harness is reused on subsequent runs (no re-deploy). To clean up:
 
-# Delete all demo harnesses (cleanup after --keep)
+```bash
 task demo:agentcore:delete
 ```
 
@@ -105,6 +78,9 @@ task lint
 
 ### AccessDeniedException
 Enable model access in AWS Bedrock console → Model access
+
+### AgentCore demo fails with AccessDeniedException
+Run `task demo:agentcore:setup` to create or update the IAM execution role.
 
 ### Authentication errors
 Verify AWS profile is set correctly:
