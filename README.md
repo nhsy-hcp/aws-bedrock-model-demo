@@ -1,4 +1,4 @@
-# AWS Bedrock Model Testing Demonstrator
+# AWS Bedrock Nova & AgentCore Demo
 
 Python scripts to test AWS Bedrock models and AgentCore:
 - Amazon Nova v1 family (Micro, Lite, Pro)
