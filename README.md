@@ -1,5 +1,7 @@
 # AWS Bedrock Nova & AgentCore Demo
 
+[![CI](https://github.com/nhsy-hcp/aws-bedrock-model-demo/actions/workflows/ci.yml/badge.svg)](https://github.com/nhsy-hcp/aws-bedrock-model-demo/actions/workflows/ci.yml)
+
 Python scripts to test AWS Bedrock models and AgentCore:
 - Amazon Nova v1 family (Micro, Lite, Pro)
 - Amazon Nova 2 models (Lite, Multimodal Embeddings)

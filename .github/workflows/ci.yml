@@ -24,6 +24,13 @@ jobs:
       - name: Install dependencies
         run: uv sync --all-extras
 
+      - name: Install shellcheck
+        run: |
+          ARCH=$(uname -m)
+          if [ "$ARCH" = "aarch64" ]; then SC_ARCH="aarch64"; else SC_ARCH="x86_64"; fi
+          curl -sSL "https://github.com/koalaman/shellcheck/releases/download/stable/shellcheck-stable.linux.${SC_ARCH}.tar.xz" | tar -xJ
+          sudo mv shellcheck-stable/shellcheck /usr/local/bin/shellcheck
+
       - name: Install pre-commit hooks
         run: uv run pre-commit install
 

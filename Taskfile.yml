@@ -74,6 +74,12 @@ tasks:
       - uv sync
       - uv sync --extra dev
 
+  test:ci:
+    desc: Validate and run CI workflow locally using act
+    cmds:
+      - act --validate
+      - act
+
   init:
     desc: Initialize project (install dependencies)
     cmds:
