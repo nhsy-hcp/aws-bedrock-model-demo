@@ -96,6 +96,12 @@ task clean
 
 - **NEVER** use `git add .` or `git add` with wildcards
 - Always stage specific files explicitly
+- **Always run the following before proposing a commit:**
+  ```bash
+  task lint
+  task test
+  task test:coverage
+  ```
 - Confirm with user before:
   - Staging files
   - Creating branches
