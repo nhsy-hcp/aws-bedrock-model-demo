@@ -74,11 +74,10 @@ def get_bedrock_client():
 
 def print_banner():
     """Print welcome banner with model catalog."""
-    print("\n╔══════════════════════════════════════════════════════════════════╗")
-    print("║         AWS Bedrock Nova & AgentCore Demo                        ║")
-    print(f"║         Region: {AWS_REGION:<48}║")
-    print(f"║         Total Models: {len(MODEL_CATALOG):<43}║")
-    print("╚══════════════════════════════════════════════════════════════════╝\n")
+    print("\n" + "═" * 67)
+    print("🚀 AWS Bedrock Nova & AgentCore Demo")
+    print(f"   Region: {AWS_REGION} | Models: {len(MODEL_CATALOG)}")
+    print("═" * 67 + "\n")
 
     print("═" * 67)
     print("📋 MODEL CATALOG")

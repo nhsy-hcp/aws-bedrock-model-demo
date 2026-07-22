@@ -56,11 +56,10 @@ def get_execution_role_arn() -> str:
 
 def print_banner():
     """Print welcome banner."""
-    print("\n╔══════════════════════════════════════════════════════════════════╗")
-    print("║         AWS Bedrock AgentCore Harness Demo                       ║")
-    print(f"║         Region: {AWS_REGION:<48}║")
-    print(f"║         Model:  {HARNESS_MODEL_ID:<48}║")
-    print("╚══════════════════════════════════════════════════════════════════╝\n")
+    print("\n" + "═" * 67)
+    print("🤖 AWS Bedrock AgentCore Harness Demo")
+    print(f"   Region: {AWS_REGION} | Model: {HARNESS_MODEL_ID}")
+    print("═" * 67 + "\n")
 
 
 def handle_error(error: Exception) -> str:
